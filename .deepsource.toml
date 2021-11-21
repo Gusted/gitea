@@ -1,0 +1,26 @@
+version = 1
+
+exclude_patterns = [
+  "public/vendor/**",
+  "vendor/**"
+]
+
+[[analyzers]]
+name = "shell"
+enabled = true
+
+[[analyzers]]
+name = "go"
+enabled = true
+
+  [analyzers.meta]
+  import_root = "github.com/Gusted/gitea"
+  dependencies_vendored = true
+
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+[[analyzers]]
+name = "sql"
+enabled = true
