@@ -11,7 +11,10 @@ import (
 	"strings"
 
 	"code.gitea.io/gitea/models"
+	asymkey_model "code.gitea.io/gitea/models/asymkey"
 	"code.gitea.io/gitea/models/db"
+	repo_model "code.gitea.io/gitea/models/repo"
+	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/base"
 	"code.gitea.io/gitea/modules/charset"
 	"code.gitea.io/gitea/modules/context"
@@ -103,7 +106,7 @@ func Graph(ctx *context.Context) {
 	copy(realBranches, branches)
 	for i, branch := range realBranches {
 		if strings.HasPrefix(branch, "--") {
-			realBranches[i] = "refs/heads/" + branch
+			realBranches[i] = git.BranchPrefix + branch
 		}
 	}
 	ctx.Data["SelectedBranches"] = realBranches
@@ -251,7 +254,6 @@ func FileHistory(ctx *context.Context) {
 func Diff(ctx *context.Context) {
 	ctx.Data["PageIsDiff"] = true
 	ctx.Data["RequireHighlightJS"] = true
-	ctx.Data["RequireSimpleMDE"] = true
 	ctx.Data["RequireTribute"] = true
 
 	userName := ctx.Repo.Owner.Name
@@ -261,8 +263,6 @@ func Diff(ctx *context.Context) {
 		gitRepo *git.Repository
 		err     error
 	)
-
-	fileOnly := ctx.FormBool("file-only")
 
 	if ctx.Data["PageIsWiki"] != nil {
 		gitRepo, err = git.OpenRepository(ctx.Repo.Repository.WikiPath())
@@ -288,13 +288,23 @@ func Diff(ctx *context.Context) {
 		commitID = commit.ID.String()
 	}
 
-	diff, err := gitdiff.GetDiffCommitWithWhitespaceBehavior(gitRepo,
-		commitID, ctx.FormString("skip-to"), setting.Git.MaxGitDiffLines,
-		setting.Git.MaxGitDiffLineCharacters, setting.Git.MaxGitDiffFiles,
-		gitdiff.GetWhitespaceFlag(ctx.Data["WhitespaceBehavior"].(string)),
-		false)
+	fileOnly := ctx.FormBool("file-only")
+	maxLines, maxFiles := setting.Git.MaxGitDiffLines, setting.Git.MaxGitDiffFiles
+	files := ctx.FormStrings("files")
+	if fileOnly && (len(files) == 2 || len(files) == 1) {
+		maxLines, maxFiles = -1, -1
+	}
+
+	diff, err := gitdiff.GetDiff(gitRepo, &gitdiff.DiffOptions{
+		AfterCommitID:      commitID,
+		SkipTo:             ctx.FormString("skip-to"),
+		MaxLines:           maxLines,
+		MaxLineCharacters:  setting.Git.MaxGitDiffLineCharacters,
+		MaxFiles:           maxFiles,
+		WhitespaceBehavior: gitdiff.GetWhitespaceFlag(ctx.Data["WhitespaceBehavior"].(string)),
+	}, files...)
 	if err != nil {
-		ctx.NotFound("GetDiffCommitWithWhitespaceBehavior", err)
+		ctx.NotFound("GetDiff", err)
 		return
 	}
 
@@ -325,12 +335,8 @@ func Diff(ctx *context.Context) {
 	ctx.Data["Title"] = commit.Summary() + " · " + base.ShortSha(commitID)
 	ctx.Data["Commit"] = commit
 	ctx.Data["Diff"] = diff
-	if fileOnly {
-		ctx.HTML(http.StatusOK, tplDiffBox)
-		return
-	}
 
-	statuses, err := models.GetLatestCommitStatus(ctx.Repo.Repository.ID, commitID, db.ListOptions{})
+	statuses, _, err := models.GetLatestCommitStatus(ctx.Repo.Repository.ID, commitID, db.ListOptions{})
 	if err != nil {
 		log.Error("GetLatestCommitStatus: %v", err)
 	}
@@ -338,13 +344,15 @@ func Diff(ctx *context.Context) {
 	ctx.Data["CommitStatus"] = models.CalcCommitStatus(statuses)
 	ctx.Data["CommitStatuses"] = statuses
 
-	verification := models.ParseCommitWithSignature(commit)
+	verification := asymkey_model.ParseCommitWithSignature(commit)
 	ctx.Data["Verification"] = verification
-	ctx.Data["Author"] = models.ValidateCommitWithEmail(commit)
+	ctx.Data["Author"] = user_model.ValidateCommitWithEmail(commit)
 	ctx.Data["Parents"] = parents
 	ctx.Data["DiffNotAvailable"] = diff.NumFiles == 0
 
-	if err := models.CalculateTrustStatus(verification, ctx.Repo.Repository, nil); err != nil {
+	if err := asymkey_model.CalculateTrustStatus(verification, ctx.Repo.Repository.GetTrustModel(), func(user *user_model.User) (bool, error) {
+		return models.IsUserRepoAdmin(ctx.Repo.Repository, user)
+	}, nil); err != nil {
 		ctx.ServerError("CalculateTrustStatus", err)
 		return
 	}
@@ -354,7 +362,7 @@ func Diff(ctx *context.Context) {
 	if err == nil {
 		ctx.Data["Note"] = string(charset.ToUTF8WithFallback(note.Message))
 		ctx.Data["NoteCommit"] = note.Commit
-		ctx.Data["NoteAuthor"] = models.ValidateCommitWithEmail(note.Commit)
+		ctx.Data["NoteAuthor"] = user_model.ValidateCommitWithEmail(note.Commit)
 	}
 
 	ctx.Data["BranchName"], err = commit.GetBranchName()
@@ -377,7 +385,7 @@ func RawDiff(ctx *context.Context) {
 	if ctx.Data["PageIsWiki"] != nil {
 		repoPath = ctx.Repo.Repository.WikiPath()
 	} else {
-		repoPath = models.RepoPath(ctx.Repo.Owner.Name, ctx.Repo.Repository.Name)
+		repoPath = repo_model.RepoPath(ctx.Repo.Owner.Name, ctx.Repo.Repository.Name)
 	}
 	if err := git.GetRawDiff(
 		repoPath,
