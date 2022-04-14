@@ -378,6 +378,7 @@ func RegisterRoutes(m *web.Route) {
 			m.Post("/email", bindIgnErr(forms.AddEmailForm{}), user_setting.EmailPost)
 			m.Post("/email/delete", user_setting.DeleteEmail)
 			m.Post("/delete", user_setting.DeleteAccount)
+			m.Post("/notification", bindIgnErr(forms.UpdateNotification{}), user_setting.NotificationPost)
 		})
 		m.Group("/appearance", func() {
 			m.Get("", user_setting.Appearance)

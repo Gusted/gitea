@@ -290,4 +290,35 @@ func loadAccountData(ctx *context.Context) {
 		ctx.Data["UserDeleteWithCommentsMaxTime"] = setting.Service.UserDeleteWithCommentsMaxTime.String()
 		ctx.Data["UserDeleteWithComments"] = ctx.Doer.CreatedUnix.AsTime().Add(setting.Service.UserDeleteWithCommentsMaxTime).After(time.Now())
 	}
+
+	// notifications is a slice that contains all the notifcations that a user can modify.
+	// FIXME: place this "default" value at a more general place.
+	notifications := map[string]string{
+		user_model.SettingsKeyNotificationNewFollower: "0",
+	}
+
+	notificationValues, err := user_model.GetUserSettings(ctx.Doer.ID, []string{user_model.SettingsKeyNotificationNewFollower})
+	if err != nil {
+		ctx.ServerError("GetUserSettings", err)
+		return
+	}
+	for k, v := range notificationValues {
+		notifications[k] = v.SettingValue
+	}
+
+	ctx.Data["Notifications"] = notifications
+}
+
+// NotificationPost response for updating user's notification
+func NotificationPost(ctx *context.Context) {
+	form := web.GetForm(ctx).(*forms.UpdateNotification)
+	ctx.Data["Title"] = ctx.Tr("settings")
+	ctx.Data["PageIsSettingsAccount"] = true
+
+	if err := user_model.SetUserSetting(ctx.Doer.ID, user_model.SettingsKeyNotificationNewFollower, form.NewFollower); err != nil {
+		ctx.ServerError("SetUserSetting", err)
+		return
+	}
+
+	ctx.Redirect(setting.AppSubURL + "/user/settings/account")
 }

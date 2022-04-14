@@ -442,3 +442,14 @@ func (f *PackageSettingForm) Validate(req *http.Request, errs binding.Errors) bi
 	ctx := context.GetContext(req)
 	return middleware.Validate(errs, ctx.Data, f, ctx.Locale)
 }
+
+// UpdateNotification form for updating user notifications
+type UpdateNotification struct {
+	NewFollower string `binding:"Required" form:"notification.new_follower"`
+}
+
+// Validate validates the fields
+func (f *UpdateNotification) Validate(req *http.Request, errs binding.Errors) binding.Errors {
+	ctx := context.GetContext(req)
+	return middleware.Validate(errs, ctx.Data, f, ctx.Locale)
+}

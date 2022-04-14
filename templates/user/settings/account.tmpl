@@ -130,6 +130,63 @@
 			</form>
 		</div>
 
+		<h4 class="ui top attached header">
+			{{.i18n.Tr "settings.notification.notifications"}}
+		</h4>
+		<div class="ui attached segment">
+			<form class="ui form" action="{{AppSubUrl}}/user/settings/account/notification" method="post">
+				{{.CsrfTokenHtml}}
+				<table class="ui celled table">
+					<thead>
+						<tr>
+							<th class="center aligned">{{.i18n.Tr "settings.notification.notification_unit"}}</th>
+							<th class="center aligned">{{.i18n.Tr "settings.notification.none_notification"}}</th>
+							<th class="center aligned">{{.i18n.Tr "settings.notification.only_notification"}}</th>
+							<th class="center aligned">{{.i18n.Tr "settings.notification.only_email_notification"}}</th>
+							<th class="center aligned">{{.i18n.Tr "settings.notification.notification_email_notification"}}</th>
+						</tr>
+					</thead>
+					<tbody>
+					<tr>
+						{{range $i, $a := .Notifications}}
+							<td>
+								<div class="field">
+									<div class="ui">
+										<label>{{$.i18n.Tr (printf "%s%s" "settings." $i)}}</label>
+										<span class="help">{{$.i18n.Tr (printf "%s%s%s" "settings." $i "_tooltip")}}</span>
+									</div>
+								</div>
+							</td>
+							<td class="center aligned">
+								<div class="ui radio checkbox">
+									<input type="radio" class="hidden" name="{{$i}}" value="0" tabindex="0" {{if eq $a "0"}}checked{{end}}>
+								</div>
+							</td>
+							<td class="center aligned">
+								<div class="ui radio checkbox">
+									<input type="radio" class="hidden" name="{{$i}}" value="1" tabindex="0" {{if eq $a "1"}}checked{{end}}>
+								</div>
+							</td>
+							<td class="center aligned">
+								<div class="ui radio checkbox">
+									<input type="radio" class="hidden" name="{{$i}}" value="2" tabindex="0" {{if eq $a "2"}}checked{{end}}>
+								</div>
+							</td>
+							<td class="center aligned">
+								<div class="ui radio checkbox">
+									<input type="radio" class="hidden" name="{{$i}}" value="3" tabindex="0" {{if eq $a "3"}}checked{{end}}>
+								</div>
+							</td>
+						{{end}}
+					</tr>
+					</tbody>
+				</table>
+				<button class="ui green button">
+					{{.i18n.Tr "settings.notification.update_notifications"}}
+				</button>
+			</form>
+		</div>
+
 		<h4 class="ui top attached error header">
 			{{.i18n.Tr "settings.delete_account"}}
 		</h4>
