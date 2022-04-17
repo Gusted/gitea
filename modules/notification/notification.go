@@ -321,3 +321,10 @@ func NotifyPackageDelete(doer *user_model.User, pd *packages_model.PackageDescri
 		notifier.NotifyPackageDelete(doer, pd)
 	}
 }
+
+// NotifyUserIsFollowing notifies the target that doer is following them.
+func NotifyUserIsFollowing(doer, target *user_model.User, notificationUnit string) {
+	for _, notifier := range notifiers {
+		notifier.NotifyUserIsFollowing(doer, target, notificationUnit)
+	}
+}

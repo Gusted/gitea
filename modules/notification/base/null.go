@@ -182,3 +182,7 @@ func (*NullNotifier) NotifyPackageCreate(doer *user_model.User, pd *packages_mod
 // NotifyPackageDelete places a place holder function
 func (*NullNotifier) NotifyPackageDelete(doer *user_model.User, pd *packages_model.PackageDescriptor) {
 }
+
+// NotifyUserIsFollowing places a place holder function
+func (*NullNotifier) NotifyUserIsFollowing(doer, target *user_model.User, notificationLevel string) {
+}

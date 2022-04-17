@@ -6,6 +6,7 @@ package user
 
 import (
 	"code.gitea.io/gitea/models/db"
+	"code.gitea.io/gitea/modules/notification"
 	"code.gitea.io/gitea/modules/timeutil"
 )
 
@@ -50,6 +51,22 @@ func FollowUser(userID, followID int64) (err error) {
 	if _, err = db.Exec(ctx, "UPDATE `user` SET num_following = num_following + 1 WHERE id = ?", userID); err != nil {
 		return err
 	}
+
+	doer, err := GetUserByID(userID)
+	if err != nil {
+		return err
+	}
+	target, err := GetUserByID(followID)
+	if err != nil {
+		return err
+	}
+	notificationLevel, err := GetUserSetting(followID, SettingsKeyNotificationNewFollower, "0")
+	if err != nil {
+		return err
+	}
+
+	notification.NotifyUserIsFollowing(doer, target, notificationLevel)
+
 	return committer.Commit()
 }
 
