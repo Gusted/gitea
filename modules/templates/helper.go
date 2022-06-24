@@ -8,6 +8,7 @@ package templates
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html"
@@ -42,6 +43,7 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/svg"
 	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/modules/translation"
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/services/gitdiff"
 
@@ -50,6 +52,32 @@ import (
 
 // Used from static.go && dynamic.go
 var mailSubjectSplit = regexp.MustCompile(`(?m)^-{3,}[\s]*$`)
+
+type tributeValue struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Name     string `json:"name"`
+	Avatar   string `json:"avatar"`
+	Fullname string `json:"fullname"`
+}
+
+type configData struct {
+	AppVer                     string                 `json:"appVer"`
+	AppURL                     string                 `json:"appUrl"`
+	AppSubURL                  string                 `json:"appSubUrl"`
+	AssetURLPrefix             string                 `json:"assetUrlPrefix"`
+	RunModeIsProd              bool                   `json:"runModeIsProd"`
+	CustomEmojis               map[string]string      `json:"customEmojis"`
+	UseServiceWorker           bool                   `json:"useServiceWorker"`
+	CSRFToken                  string                 `json:"csrfToken"`
+	PageData                   map[string]interface{} `json:"pageData"`
+	RequireTribute             bool                   `json:"requireTribute"`
+	NotificationSettings       map[string]int         `json:"notificationSettings"`
+	EnableTimeTracking         bool                   `json:"enableTimeTracking"`
+	TributeValues              []tributeValue         `json:"tributeValues"`
+	MermaidMaxSourceCharacters int                    `json:"mermaidMaxSourceCharacters"`
+	I18n                       map[string]string      `json:"i18n"`
+}
 
 // NewFuncMap returns functions for injecting to templates
 func NewFuncMap() []template.FuncMap {
@@ -190,9 +218,6 @@ func NewFuncMap() []template.FuncMap {
 		"UseServiceWorker": func() bool {
 			return setting.UI.UseServiceWorker
 		},
-		"EnableTimetracking": func() bool {
-			return setting.Service.EnableTimetracking
-		},
 		"FilenameIsImage": func(filename string) bool {
 			mimeType := mime.TypeByExtension(filepath.Ext(filename))
 			return strings.HasPrefix(mimeType, "image/")
@@ -308,14 +333,6 @@ func NewFuncMap() []template.FuncMap {
 		},
 		"CommentMustAsDiff":   gitdiff.CommentMustAsDiff,
 		"MirrorRemoteAddress": mirrorRemoteAddress,
-		"NotificationSettings": func() map[string]interface{} {
-			return map[string]interface{}{
-				"MinTimeout":            int(setting.UI.Notification.MinTimeout / time.Millisecond),
-				"TimeoutStep":           int(setting.UI.Notification.TimeoutStep / time.Millisecond),
-				"MaxTimeout":            int(setting.UI.Notification.MaxTimeout / time.Millisecond),
-				"EventSourceUpdateTime": int(setting.UI.Notification.EventSourceUpdateTime / time.Millisecond),
-			}
-		},
 		"containGeneric": func(arr, v interface{}) bool {
 			arrV := reflect.ValueOf(arr)
 			if arrV.Kind() == reflect.String && reflect.ValueOf(v).Kind() == reflect.String {
@@ -388,9 +405,6 @@ func NewFuncMap() []template.FuncMap {
 			html += "</span>"
 			return template.HTML(html)
 		},
-		"MermaidMaxSourceCharacters": func() int {
-			return setting.MermaidMaxSourceCharacters
-		},
 		"Join":        strings.Join,
 		"QueryEscape": url.QueryEscape,
 		"DotEscape":   DotEscape,
@@ -453,6 +467,94 @@ func NewFuncMap() []template.FuncMap {
 				items = append(items, i)
 			}
 			return items
+		},
+		"GenConfigScript": func(ctxData map[string]interface{}) template.HTML {
+			randomBytes, err := util.CryptoRandomBytes(16)
+			if err != nil {
+				// Panic?
+				panic("¯\\_(ツ)_/¯")
+			}
+			nonce := hex.EncodeToString(randomBytes)
+			i18n := ctxData["i18n"].(translation.Locale)
+			requireTribute := true
+			tributeValues := []tributeValue{}
+			if requireTribute {
+				participants, ok := ctxData["Participants"].([]*user_model.User)
+				if ok {
+					for _, participant := range participants {
+						tributeValues = append(tributeValues, tributeValue{
+							Name:     participant.Name,
+							Value:    participant.Name,
+							Fullname: participant.FullName,
+							Avatar:   participant.AvatarLink(),
+							Key:      participant.Name + " " + participant.FullName,
+						})
+					}
+				}
+				assignees, ok := ctxData["Assignees"].([]*user_model.User)
+				if ok {
+					for _, assignee := range assignees {
+						tributeValues = append(tributeValues, tributeValue{
+							Name:     assignee.Name,
+							Value:    assignee.Name,
+							Fullname: assignee.FullName,
+							Avatar:   assignee.AvatarLink(),
+							Key:      assignee.Name + " " + assignee.FullName,
+						})
+					}
+				}
+				mentionableTeams, ok := ctxData["MentionableTeams"].([]*organization.Team)
+				if ok {
+					mentionableTeamsOrg := ctxData["MentionableTeamsOrg"].(string)
+					mentionableTeamsOrgAvatar := ctxData["MentionableTeamsOrgAvatar"].(string)
+					for _, mentionableTeam := range mentionableTeams {
+						craftedValue := mentionableTeamsOrg + "/" + mentionableTeam.Name
+
+						tributeValues = append(tributeValues, tributeValue{
+							Name:   craftedValue,
+							Value:  craftedValue,
+							Avatar: mentionableTeamsOrgAvatar,
+							Key:    craftedValue,
+						})
+					}
+				}
+			}
+			// Need more safety around type assertion.
+			jsonConfigData, err := json.Marshal(configData{
+				AppVer:           setting.AppVer,
+				AppURL:           setting.AppURL,
+				AppSubURL:        setting.AppSubURL,
+				AssetURLPrefix:   setting.StaticURLPrefix + "/assets",
+				RunModeIsProd:    setting.IsProd,
+				CustomEmojis:     setting.UI.CustomEmojisMap,
+				UseServiceWorker: setting.UI.UseServiceWorker,
+				CSRFToken:        ctxData["CsrfToken"].(string),
+				PageData:         ctxData["PageData"].(map[string]interface{}),
+				RequireTribute:   requireTribute,
+				NotificationSettings: map[string]int{
+					"MinTimeout":            int(setting.UI.Notification.MinTimeout / time.Millisecond),
+					"TimeoutStep":           int(setting.UI.Notification.TimeoutStep / time.Millisecond),
+					"MaxTimeout":            int(setting.UI.Notification.MaxTimeout / time.Millisecond),
+					"EventSourceUpdateTime": int(setting.UI.Notification.EventSourceUpdateTime / time.Millisecond),
+				},
+				EnableTimeTracking:         setting.Service.EnableTimetracking,
+				TributeValues:              tributeValues,
+				MermaidMaxSourceCharacters: setting.MermaidMaxSourceCharacters,
+				I18n: map[string]string{
+					"copy_success":   i18n.Tr("copy_success"),
+					"copy_error":     i18n.Tr("copy_error"),
+					"error_occurred": i18n.Tr("error.occurred"),
+					"network_error":  i18n.Tr("error.network_error"),
+				},
+			})
+			if err != nil {
+				// Panic?
+				panic("¯\\_(ツ)_/¯")
+			}
+			return template.HTML("<script nonce=" + nonce + ">" +
+				"window.addEventListener('error', function(e) {window._globalHandlerErrors=window._globalHandlerErrors||[]; window._globalHandlerErrors.push(e);});" +
+				"window.config = " + string(jsonConfigData) + ";" +
+				"</script>")
 		},
 	}}
 }
