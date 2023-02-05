@@ -92,7 +92,7 @@ func parseTreeEntries(data []byte, ptree *Tree) ([]*TreeEntry, error) {
 	return entries, nil
 }
 
-func catBatchParseTreeEntries(ptree *Tree, rd *bufio.Reader, sz int64) ([]*TreeEntry, error) {
+func catBatchParseTreeEntries(ptree *Tree, rd *bufio.Reader, sz int64, hashLen int) ([]*TreeEntry, error) {
 	fnameBuf := make([]byte, 4096)
 	modeBuf := make([]byte, 40)
 	shaBuf := make([]byte, 40)
@@ -100,7 +100,7 @@ func catBatchParseTreeEntries(ptree *Tree, rd *bufio.Reader, sz int64) ([]*TreeE
 
 loop:
 	for sz > 0 {
-		mode, fname, sha, count, err := ParseTreeLine(rd, modeBuf, fnameBuf, shaBuf)
+		mode, fname, sha, count, err := ParseTreeLine(rd, hashLen, modeBuf, fnameBuf, shaBuf)
 		if err != nil {
 			if err == io.EOF {
 				break loop

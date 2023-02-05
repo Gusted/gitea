@@ -54,7 +54,11 @@ func (t *Tree) ListEntries() (Entries, error) {
 			}
 		}
 		if typ == "tree" {
-			t.entries, err = catBatchParseTreeEntries(t, rd, sz)
+			shaLen, err := t.repo.GetHashLength()
+			if err != nil {
+				return nil, err
+			}
+			t.entries, err = catBatchParseTreeEntries(t, rd, sz, shaLen)
 			if err != nil {
 				return nil, err
 			}

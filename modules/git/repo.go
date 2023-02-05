@@ -101,6 +101,41 @@ func (repo *Repository) IsEmpty() (bool, error) {
 	return strings.TrimSpace(output.String()) == "", nil
 }
 
+// GetObjectFormat returns the object format.
+func (repo *Repository) GetObjectFormat() (string, error) {
+	var errbuf, output strings.Builder
+	if err := NewCommand(repo.Ctx, "rev-parse", "--show-object-format").
+		Run(&RunOpts{
+			Dir:    repo.Path,
+			Stdout: &output,
+			Stderr: &errbuf,
+		}); err != nil {
+		if err.Error() == "exit status 1" && errbuf.String() == "" {
+			return "", nil
+		}
+		return "", fmt.Errorf("show object format: %w - %s", err, errbuf.String())
+	}
+
+	return strings.TrimSpace(output.String()), nil
+}
+
+// GetHashLength returns the hash length of an object.
+func (repo *Repository) GetHashLength() (int, error) {
+	objectFormat, err := repo.GetObjectFormat()
+	if err != nil {
+		return 0, err
+	}
+
+	hashLen := 0
+	switch objectFormat {
+	case "sha1":
+		hashLen = 20
+	case "sha256":
+		hashLen = 32
+	}
+	return hashLen, nil
+}
+
 // CloneRepoOptions options when clone a repository
 type CloneRepoOptions struct {
 	Timeout       time.Duration
