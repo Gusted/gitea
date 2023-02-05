@@ -28,6 +28,7 @@ var Git = struct {
 	LargeObjectThreshold      int64
 	DisableCoreProtectNTFS    bool
 	DisablePartialClone       bool
+	EnableSHA256              bool `ini:"ENABLE_SHA256"`
 	Timeout                   struct {
 		Default int
 		Migrate int
@@ -50,6 +51,7 @@ var Git = struct {
 	PullRequestPushMessage:    true,
 	LargeObjectThreshold:      1024 * 1024,
 	DisablePartialClone:       false,
+	EnableSHA256:              false,
 	Timeout: struct {
 		Default int
 		Migrate int

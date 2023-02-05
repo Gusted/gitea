@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"code.gitea.io/gitea/modules/proxy"
+	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/util"
 )
 
@@ -73,6 +74,11 @@ func InitRepository(ctx context.Context, repoPath string, bare bool) error {
 	if bare {
 		cmd.AddArguments("--bare")
 	}
+
+	if setting.Git.EnableSHA256 {
+		cmd.AddArguments("--object-format=sha256")
+	}
+
 	_, _, err = cmd.RunStdString(&RunOpts{Dir: repoPath})
 	return err
 }

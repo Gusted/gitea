@@ -324,11 +324,11 @@ func ParseTreeLine(rd *bufio.Reader, modeBuf, fnameBuf, shaBuf []byte) (mode, fn
 	fnameBuf = fnameBuf[:len(fnameBuf)-1]
 	fname = fnameBuf
 
-	// Deal with the 20-byte SHA
+	// Deal with the 32-byte SHA
 	idx = 0
-	for idx < 20 {
+	for idx < 32 {
 		var read int
-		read, err = rd.Read(shaBuf[idx:20])
+		read, err = rd.Read(shaBuf[idx:32])
 		n += read
 		if err != nil {
 			return
